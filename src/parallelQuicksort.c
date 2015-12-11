@@ -11,7 +11,6 @@
 */
 
 
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -19,26 +18,17 @@
 #include <string.h>
 
 #define DNUM 1000000
-#define THREAD_LEVEL 10
+/*Magic number, doesn't seem to be worth to parallelize sub array of size < 10000*/
+#define SIZE_THRESHOLD 10000
 
 //for sequential and parallel implementation
-void swap(double lyst[], int i, int j);
 int partition(double lyst[], int lo, int hi);
 void quicksortHelper(double lyst[], int lo, int hi);
 void quicksort(double lyst[], int size);
 int isSorted(double lyst[], int size);
 
 //for parallel implementation
-void parallelQuicksort(double lyst[], int size, int tlevel);
-void *parallelQuicksortHelper(void *threadarg) __attribute__ ((noreturn));
-struct thread_data {
-  double *lyst;
-  int low;
-  int high;
-  int level;
-};
-//thread_data should be thread-safe, since while lyst is 
-//shared, [low, high] will not overlap among threads.
+void parallelQuicksortHelper(double lyst[], int low, int high);
 
 //for the builtin qsort, for fun:
 int compare_doubles(const void *a, const void *b);
@@ -96,9 +86,13 @@ int main(int argc, char *argv[])
   //copy list.
   memcpy(lyst, lystbck, NUM * sizeof(double));
 
+#pragma omp parallel
+#pragma omp master
+  {
   gettimeofday(&start, NULL);
-  parallelQuicksort(lyst, NUM, THREAD_LEVEL);
+  parallelQuicksortHelper(lyst, 0, NUM - 1);
   gettimeofday(&end, NULL);
+  }
 
   if (!isSorted(lyst, NUM)) {
     printf("Oops, lyst did not get sorted by parallelQuicksort.\n");
@@ -126,7 +120,6 @@ int main(int argc, char *argv[])
 
   free(lyst);
   free(lystbck);
-  pthread_exit(NULL);
 }
 
 void quicksort(double lyst[], int size)
@@ -143,141 +136,48 @@ void quicksortHelper(double lyst[], int lo, int hi)
   quicksortHelper(lyst, b + 1, hi);
 }
 
-void swap(double lyst[], int i, int j)
-{
-  double temp = lyst[i];
-  lyst[i] = lyst[j];
-  lyst[j] = temp;
-}
-
-int partition(double lyst[], int lo, int hi)
+inline int partition(double lyst[], int lo, int hi)
 {
   int b = lo;
-  int r = (int) (lo + (hi - lo) * (1.0 * rand() / RAND_MAX));
+  /*Get rid of rand, it's too costly compared to function's execution time
+   * (*yes* in the worst case scenario we are screwed, but so is the sequential version ;))*/
+  /*int r = (int) (lo + (hi - lo) * (1.0 * rand() / RAND_MAX));*/
+  int r = hi;
   double pivot = lyst[r];
-  swap(lyst, r, hi);
+  double tmp;
+  /*swap(lyst, r, hi);*/
   for (int i = lo; i < hi; i++) {
     if (lyst[i] < pivot) {
-      swap(lyst, i, b);
+      /*Manually inline swap, juuuust in case (we *really* don't want a function call here)*/
+      tmp = lyst[i];
+      lyst[i] = lyst[b];
+      lyst[b] = tmp;
       b++;
     }
   }
-  swap(lyst, hi, b);
+  tmp = lyst[hi];
+  lyst[hi] = lyst[b];
+  lyst[b] = tmp;
   return b;
 }
 
 
-/*
-parallel quicksort top level:
-instantiate parallelQuicksortHelper thread, and that's 
-basically it.
-*/
-void parallelQuicksort(double lyst[], int size, int tlevel)
-{
-  int rc;
-  void *status;
-
-  //Want joinable threads (usually default).
-  pthread_attr_t attr;
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-  //pthread function can take only one argument, so struct.
-  struct thread_data td;
-  td.lyst = lyst;
-  td.low = 0;
-  td.high = size - 1;
-  td.level = tlevel;
-
-  //The top-level thread.
-  pthread_t theThread;
-  rc = pthread_create(&theThread, &attr, parallelQuicksortHelper,
-                      (void *) &td);
-  if (rc) {
-    printf("ERROR; return code from pthread_create() is %d\n", rc);
-    exit(-1);
-  }
-  //Now join the thread (wait, as joining blocks) and quit.
-  pthread_attr_destroy(&attr);
-  rc = pthread_join(theThread, &status);
-  if (rc) {
-    printf("ERROR; return code from pthread_join() is %d\n", rc);
-    exit(-1);
-  }
-  //printf("Main: completed join with top thread having a status of %ld\n",
-  //              (long)status);
-
-}
 
 /*
 parallelQuicksortHelper
--if the level is still > 0, then partition and make 
-parallelQuicksortHelper threads to solve the left and 
-right-hand sides, then quit. Otherwise, call sequential.
 */
-void *parallelQuicksortHelper(void *threadarg)
+void parallelQuicksortHelper(double lyst[], int low, int high)
 {
-  int mid, t, rc;
-  void *status;
-
-  struct thread_data *my_data;
-  my_data = (struct thread_data *) threadarg;
-
-  //fyi:
-  //printf("Thread responsible for [%d, %d], level %d.\n",
-  //              my_data->low, my_data->high, my_data->level);
-
-  if (my_data->level <= 0 || my_data->low == my_data->high+1) {
-    //We have plenty of threads, finish with sequential.
-    quicksortHelper(my_data->lyst, my_data->low, my_data->high);
-    pthread_exit(NULL);
-  }
-  //Want joinable threads (usually default).
-  pthread_attr_t attr;
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-  //Now we partition our part of the lyst.
-  mid = partition(my_data->lyst, my_data->low, my_data->high);
-
-  //At this point, we will create threads for the 
-  //left and right sides.  Must create their data args.
-  struct thread_data thread_data_array[2];
-
-  for (t = 0; t < 2; t++) {
-    thread_data_array[t].lyst = my_data->lyst;
-    thread_data_array[t].level = my_data->level - 1;
-  }
-  thread_data_array[0].low = my_data->low;
-  thread_data_array[0].high = mid - 1;
-  thread_data_array[1].low = mid + 1;
-  thread_data_array[1].high = my_data->high;
-
-  //Now, instantiate the threads.
-  //In quicksort of course, due to the transitive property,
-  //no elements in the left and right sides of mid will have
-  //to be compared again.
-  pthread_t threads[2];
-  for (t = 0; t < 2; t++) {
-    rc = pthread_create(&threads[t], &attr, parallelQuicksortHelper,
-                        (void *) &thread_data_array[t]);
-    if (rc) {
-      printf("ERROR; return code from pthread_create() is %d\n", rc);
-      exit(-1);
-    }
-  }
-
-  pthread_attr_destroy(&attr);
-  //Now, join the left and right sides to finish.
-  for (t = 0; t < 2; t++) {
-    rc = pthread_join(threads[t], &status);
-    if (rc) {
-      printf("ERROR; return code from pthread_join() is %d\n", rc);
-      exit(-1);
-    }
-  }
-
-  pthread_exit(NULL);
+  if (low >= high)
+    return ;
+  int mid = partition(lyst, low, high);
+  /*Create tasks for both sub sections, only if the section is big enough*/
+#pragma omp task shared(lyst) firstprivate(low, mid) if(high - low > SIZE_THRESHOLD)
+  parallelQuicksortHelper(lyst, low, mid - 1);
+  /*One task is enough for this kind of recursive algorithm*/
+  parallelQuicksortHelper(lyst, mid + 1, high);
+#pragma omp taskwait
+  return ;
 }
 
 //check if the elements of lyst are in non-decreasing order.
