@@ -224,21 +224,41 @@ For the record I used the GCC 5.2 release toolchain for my experiments.
 - Look at different runtimes, e.g. other LibGOMP version, LibIOMP, libKOMP.
 
 - The bottleneck of the parallel implementation is the partitioning function, so to actually get good performance, one should look at an hypercube implementation of quicksort.
-  (i.e. given a number of cores being a power of 2, dispatch the work evenly among threads, then merge the results).
+  (i.e. given 2^N cores, dispatch the work evenly among cores, then merge the results).
   cf: http://www.ijcaonline.org/archives/volume57/number9/9142-3363
 
 
 *** Sample graphs on my personal computer
 
+- Spec :
+  * Intel i7-3720QM CPU @ 2.60GHz, Linux 4.2
+  * 4 physical cores, 2 logical cores (hyperthreads) per core.
+
 (png generated with convert from the pdf file)
 
 [[file:./data/daisy_2015-12-15/sample.dat.sequential.png]]
 
-Here the high standard deviation may be due to the input list ?
+Note: This nicely shows the overhead of the parallel version on one core against the sequential version.
 
 [[file:./data/daisy_2015-12-15/sample.dat.parallel.png]]
 
 Here a high standard deviation could be noise from other application, or the program being scheduled on hyperthreads. ~OMP_PLACES~ could be used to specify precisely which cores to use (e.g. ~OMP_PLACES="{0}:4:2"~ to have 4 places starting at cores number 0 with a stride of 2).
 
 
+*** Sample graphs on a huge machine
 
+- Spec :
+  * Intel Xeon E5-4640 @ 2.4 GHz, Sandy Bridge, Linux 3.0
+  * 24 Numa nodes, 8 cores per node, 192 total cores
+
+[[file:./data/idchire_2015-12-15/sample.dat.sequential.png]]
+
+Note: same remark about overhead
+
+[[file:./data/idchire_2015-12-15/sample.dat.parallel.png]]
+
+Here the high standard deviation for small number of threads may be due to the input list ?
+
+Note : ploting speedup could be nice to normalize the view
+
+Note: looking at thread activity/speedup, it's obvious that the parallel version is actually bad (but it's probably enough for a personnal computer !)

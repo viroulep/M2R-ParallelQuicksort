@@ -9,7 +9,7 @@ framsum = ddply(wholeframe, c("Version","Threads", "Size"), summarize, MeanTime 
 pd = position_dodge(width=.1)
 
 
-baseplot = ggplot(framsum)
+baseplot = ggplot(subset(framsum, Threads==1))
 pdf(paste(datafile,".sequential.pdf", sep = ''), width = 10, height=6)
 myplot = baseplot + geom_line(aes(x=Size, y=MeanTime, group=Version, color=Version))
 myplot = myplot + geom_errorbar(aes(x=Size, ymin=MeanTime-SDev, ymax=MeanTime+SDev, width=.1))
@@ -32,7 +32,7 @@ myplot = myplot + guides(col = guide_legend(ncol=3))
 myplot = myplot + theme(legend.text = element_text(size=8), legend.title = element_text(size=8), legend.position="bottom")
 myplot = myplot + ggtitle("Performance evaluation for parallel version on various sizes")
 myplot = myplot + ylab("Time (s)")
-myplot = myplot + xlab("# of elements in the list")
+myplot = myplot + xlab("# of threads")
 print(myplot)
 dev.off()
 
