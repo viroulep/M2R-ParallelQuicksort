@@ -208,16 +208,16 @@ The implementation is basically spawning tasks recursively until we reach a cuto
 For the record I used the GCC 5.2 release toolchain for my experiments.
 
 *** Launching and thread control
-- You can control the number of threads by specifying the `OMP_NUM_THREADS` environment variable, e.g. use : `OMP_NUM_THREADS=4 ./src/parallelQuicksort` to use 4 threads for parallelQuicksort.
+- You can control the number of threads by specifying the ~OMP_NUM_THREADS~ environment variable, e.g. use : ~OMP_NUM_THREADS=4 ./src/parallelQuicksort~ to use 4 threads for parallelQuicksort.
 
-- You can launch only the parallel version by specifying `--noseq` after the size, e.g. : `OMP_NUM_THREADS=4 ./src/parallelQuicksort 1000000 --noseq`.
+- You can launch only the parallel version by specifying ~--noseq~ after the size, e.g. : ~OMP_NUM_THREADS=4 ./src/parallelQuicksort 1000000 --noseq~.
 
-- To run a full bench of the program, with the parallel version using 2, 4, and 8 threads you can use : `./scripts/run_benchmarking.sh "2 4 8"` (make sure the sh has x mod).
+- To run a full bench of the program, with the parallel version using 2, 4, and 8 threads you can use : ~./scripts/run_benchmarking.sh "2 4 8"~ (make sure the sh has x mod).
 
-- To convert the data file to R friendly format : `perl ./scripts/csv_quicksort_extractor.pl < ./data/path/tomeasurements.txt > ./data/path/tordata.dat`
+- To convert the data file to R friendly format : ~perl ./scripts/csv_quicksort_extractor.pl < ./data/path/tomeasurements.txt > ./data/path/tordata.dat~
 
-- To generate *very* basic graphs to compare sequential implementations, and the performances evolution of the parallel version (on list of size > 1000000), you can run `Rscript scripts/gen_graph.R path/to/sample.dat`.
-  The script will generate `sample.dat.sequential.pdf` and `sample.dat.parallel.pdf` in the original directory, containing the corresponding graph.
+- To generate *very* basic graphs to compare sequential implementations, and the performances evolution of the parallel version (on list of size > 1000000), you can run ~Rscript scripts/gen_graph.R path/to/sample.dat~.
+  The script will generate ~sample.dat.sequential.pdf~ and ~sample.dat.parallel.pdf~ in the original directory, containing the corresponding graph.
 
 *** Notes and TODOs
 - Look at how task-generation cutoff impact the parallel time
@@ -238,7 +238,7 @@ Here the high standard deviation may be due to the input list ?
 
 [[file:./data/daisy_2015-12-15/sample.dat.parallel.png]]
 
-Here a high standard deviation could be noise from other application, or the program being scheduled on hyperthreads. `OMP_PLACES` could be used to specify precisely which cores to use (e.g. `OMP_PLACES="{0}:4:2"` to have 4 places starting at cores number 0 with a stride of 2).
+Here a high standard deviation could be noise from other application, or the program being scheduled on hyperthreads. ~OMP_PLACES~ could be used to specify precisely which cores to use (e.g. ~OMP_PLACES="{0}:4:2"~ to have 4 places starting at cores number 0 with a stride of 2).
 
 
 
