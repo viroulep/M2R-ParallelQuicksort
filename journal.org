@@ -228,5 +228,17 @@ For the record I used the GCC 5.2 release toolchain for my experiments.
   cf: http://www.ijcaonline.org/archives/volume57/number9/9142-3363
 
 
+*** Sample graphs on my personal computer
+
+(png generated with convert from the pdf file)
+
+[[file:./data/daisy_2015-12-15/sample.dat.sequential.png]]
+
+Here the high standard deviation may be due to the input list ?
+
+[[file:./data/daisy_2015-12-15/sample.dat.parallel.png]]
+
+Here a high standard deviation could be noise from other application, or the program being scheduled on hyperthreads. `OMP_PLACES` could be used to specify precisely which cores to use (e.g. `OMP_PLACES="{0}:4:2"` to have 4 places starting at cores number 0 with a stride of 2).
+
 
 
