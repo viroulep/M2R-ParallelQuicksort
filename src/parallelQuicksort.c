@@ -17,9 +17,12 @@
 #include <sys/time.h>
 #include <string.h>
 
+#include "omp.h"
+
 #define DNUM 1000000
 /*Magic number, doesn't seem to be worth to parallelize sub array of size < 10000*/
 #define SIZE_THRESHOLD 10000
+#define output_result(version, elems, threads, results) printf("%s quicksort for %i elements using %i threads took: %lf sec.\n", version, elems, threads, results)
 
 //for sequential and parallel implementation
 int partition(double lyst[], int lo, int hi);
@@ -44,14 +47,20 @@ int main(int argc, char *argv[])
 {
   struct timeval start, end;
   double diff;
+  int start_sequential = 1;
 
   srand(time(NULL));            //seed random
 
   int NUM = DNUM;
-  if (argc == 2)                //user specified list size.
+  if (argc >= 2)                //user specified list size.
   {
     NUM = atoi(argv[1]);
   }
+  if (argc >= 3) {
+    if (!strcmp("--noseq", argv[2]))
+      start_sequential = 0;
+  }
+
   //Want to compare sorting on the same list,
   //so backup.
   double *lystbck = (double *) malloc(NUM * sizeof(double));
@@ -62,6 +71,10 @@ int main(int argc, char *argv[])
     lystbck[i] = 1.0 * rand() / RAND_MAX;
   }
 
+  /*This goto is intentional, it's trolly enough and I'm too lazy to indent
+   * And that's what the compiler gonna generate anyway */
+  if (!start_sequential)
+    goto parallel;
   //copy list.
   memcpy(lyst, lystbck, NUM * sizeof(double));
 
@@ -77,7 +90,8 @@ int main(int argc, char *argv[])
   //Compute time difference.
   diff = ((end.tv_sec * 1000000 + end.tv_usec)
           - (start.tv_sec * 1000000 + start.tv_usec)) / 1000000.0;
-  printf("Sequential quicksort took: %lf sec.\n", diff);
+  output_result("Sequential", NUM, 1, diff);
+parallel:
 
 
 
@@ -85,10 +99,12 @@ int main(int argc, char *argv[])
 
   //copy list.
   memcpy(lyst, lystbck, NUM * sizeof(double));
+  int nthreads;
 
 #pragma omp parallel
 #pragma omp master
   {
+  nthreads = omp_get_num_threads();
   gettimeofday(&start, NULL);
   parallelQuicksortHelper(lyst, 0, NUM - 1);
   gettimeofday(&end, NULL);
@@ -100,10 +116,12 @@ int main(int argc, char *argv[])
   //Compute time difference.
   diff = ((end.tv_sec * 1000000 + end.tv_usec)
           - (start.tv_sec * 1000000 + start.tv_usec)) / 1000000.0;
-  printf("Parallel quicksort took: %lf sec.\n", diff);
+  output_result("Parallel", NUM, nthreads, diff);
 
 
-
+  /*Same here, intentional*/
+  if (!start_sequential)
+    goto end;
   //Finally, built-in for reference:
   memcpy(lyst, lystbck, NUM * sizeof(double));
   gettimeofday(&start, NULL);
@@ -116,7 +134,8 @@ int main(int argc, char *argv[])
   //Compute time difference.
   diff = ((end.tv_sec * 1000000 + end.tv_usec)
           - (start.tv_sec * 1000000 + start.tv_usec)) / 1000000.0;
-  printf("Built-in quicksort took: %lf sec.\n", diff);
+  output_result("Builtin", NUM, 1, diff);
+end:
 
   free(lyst);
   free(lystbck);
